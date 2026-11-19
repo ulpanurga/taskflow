@@ -1,79 +1,66 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:taskflow/core/di/injection.dart';
+import 'package:taskflow/src/domain/entities/task_entities.dart';
+import 'package:taskflow/src/presentation/bloc/dashboard_cubit.dart';
+import 'package:taskflow/src/presentation/bloc/projects_cubit.dart';
+import 'package:taskflow/src/presentation/bloc/session_cubit.dart';
+import 'package:taskflow/src/presentation/bloc/tasks_cubit.dart';
+import 'package:taskflow/src/presentation/bloc/users_cubit.dart';
+import 'package:taskflow/src/presentation/pages/dashboard_page.dart';
+import 'package:taskflow/src/presentation/pages/projects_page.dart';
+import 'package:taskflow/src/presentation/pages/tasks_page.dart';
+import 'package:taskflow/src/presentation/pages/users_page.dart';
 
-import 'database/app_database.dart';
-import 'presentation/screens/dashboard_screen.dart';
-import 'presentation/screens/projects_screen.dart';
-import 'presentation/screens/tasks_screen.dart';
-import 'presentation/screens/users_screen.dart';
-import 'repositories/attachment_repository.dart';
-import 'repositories/comment_repository.dart';
-import 'repositories/data_seeder.dart';
-import 'repositories/index_benchmark.dart';
-import 'repositories/project_repository.dart';
-import 'repositories/stats_repository.dart';
-import 'repositories/task_repository.dart';
-import 'repositories/user_repository.dart';
-import 'state/session_controller.dart';
-import 'state/tasks_controller.dart';
-
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(TaskFlowApp(db: AppDatabase(openConnection())));
+  await configureDependencies();
+  runApp(const TaskFlowApp());
 }
 
 class TaskFlowApp extends StatelessWidget {
-  final AppDatabase db;
-  const TaskFlowApp({super.key, required this.db});
+  const TaskFlowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final taskRepo = TaskRepository(db);
-    return MultiProvider(
+    return MultiBlocProvider(
       providers: [
-        Provider<AppDatabase>.value(value: db),
-        Provider<UserRepository>.value(value: UserRepository(db)),
-        Provider<ProjectRepository>.value(value: ProjectRepository(db)),
-        Provider<TaskRepository>.value(value: taskRepo),
-        Provider<CommentRepository>.value(value: CommentRepository(db)),
-        Provider<AttachmentRepository>.value(value: AttachmentRepository(db)),
-        Provider<StatsRepository>.value(value: StatsRepository(db)),
-        Provider<DataSeeder>.value(value: DataSeeder(db)),
-        Provider<IndexBenchmark>.value(value: IndexBenchmark(db, taskRepo)),
-        ChangeNotifierProvider<SessionController>(
-            create: (_) => SessionController()),
-        // Контроллер списка «Все задачи»
-        ChangeNotifierProvider<TasksController>(
-            create: (c) => TasksController(c.read<TaskRepository>())),
+        // Один на всё приложение, закрывать его не нужно.
+        BlocProvider<SessionCubit>.value(value: getIt<SessionCubit>()),
+        BlocProvider<UsersCubit>(create: (_) => getIt<UsersCubit>()..load()),
+        BlocProvider<ProjectsCubit>(
+            create: (_) => getIt<ProjectsCubit>()..load()),
+        BlocProvider<TasksCubit>(
+            create: (_) =>
+                getIt<TasksCubit>(param1: const TaskFilterEntity())..load()),
+        BlocProvider<DashboardCubit>(
+            create: (_) => getIt<DashboardCubit>()..load()),
       ],
       child: MaterialApp(
         title: 'TaskFlow',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorSchemeSeed: Colors.indigo,
-          useMaterial3: true,
-        ),
-        home: const HomeShell(),
+        theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+        home: const HomePage(),
       ),
     );
   }
 }
 
-class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomePageState extends State<HomePage> {
   int _index = 0;
 
   static const _pages = <Widget>[
-    ProjectsScreen(),
-    TasksScreen(),
-    UsersScreen(),
-    DashboardScreen(),
+    ProjectsPage(),
+    TasksPage(),
+    UsersPage(),
+    DashboardPage(),
   ];
 
   @override
